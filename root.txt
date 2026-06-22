@@ -1,0 +1,12 @@
+dalil_app/
+?
+??? app.py                  # Flask Backend Application
+??? mydatabase.db           # SQLite Database (Auto-created)
+?
+??? uploads/                # Directory to store uploaded PDF documents
+?
+??? templates/              # HTML Templates Front-End
+    ??? index.html          # Main Dashboard & Transactions UI
+    ??? customers.html      # Customer Management UI
+    ??? documents.html      # Document Control UI
+    ??? qr_gen.html         # QR Code Generator UI

@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Management</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>body { background-color: #2c3e50; color: white; }</style>
+</head>
+<body class="p-4">
+    <div class="d-flex justify-content-between mb-4">
+        <h2>CUSTOMER REGISTRATION</h2>
+        <div>
+            <a href="/" class="btn btn-light">Transactions</a>
+            <a href="/customers" class="btn btn-primary active">Customers</a>
+            <a href="/documents" class="btn btn-light">Documents</a>
+            <a href="/qr" class="btn btn-light">QR Generator</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 bg-dark p-3 rounded">
+            <div class="mb-2"><label>Name</label><input type="text" id="c_name" class="form-control"></div>
+            <div class="mb-2"><label>Mobile</label><input type="text" id="c_mobile" class="form-control"></div>
+            <div class="mb-2"><label>Email</label><input type="email" id="c_email" class="form-control"></div>
+            <div class="mb-3"><label>Address</label><textarea id="c_address" class="form-control" rows="2"></textarea></div>
+            <button class="btn btn-success w-100" onclick="saveCustomer()">Save Customer Info</button>
+        </div>
+        <div class="col-md-8">
+            <div class="bg-white text-dark p-3 rounded">
+                <table class="table table-bordered">
+                    <thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>Address</th><th>Actions</th></tr></thead>
+                    <tbody id="customer-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadCustomers() {
+            fetch('/api/customers').then(res => res.json()).then(data => {
+                let html = '';
+                data.forEach(c => {
+                    html += `<tr>
+                        <td>${c.name}</td><td>${c.mobile}</td><td>${c.email}</td><td>${c.address}</td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.id})">Remove</button></td>
+                    </tr>`;
+                });
+                document.getElementById('customer-body').innerHTML = html;
+            });
+        }
+
+        function saveCustomer() {
+            let payload = {
+                name: document.getElementById('c_name').value, mobile: document.getElementById('c_mobile').value,
+                email: document.getElementById('c_email').value, address: document.getElementById('c_address').value
+            };
+            fetch('/api/customers', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            }).then(() => { loadCustomers(); });
+        }
+
+        function deleteCustomer(id) {
+            if(confirm("Remove this customer profile?")) {
+                fetch(`/api/customers/${id}`, { method: 'DELETE' }).then(() => loadCustomers());
+            }
+        }
+        window.onload = loadCustomers;
+// Intercept Enter key and turn it into a Tab focus switch
+    document.addEventListener('keydown', function (e) {
+        // Check if the pressed key is Enter and we are inside an input, select, or textarea
+        if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
+            
+            // If it's a textarea, let Enter behave normally (new line) unless you hold Shift
+            if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
+                return; 
+            }
+
+            // Prevent the default form submission behavior of the Enter key
+            e.preventDefault();
+
+            // Find all visible, enabled input elements on the page
+            const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
+            const focusable = Array.from(document.querySelectorAll(selectors));
+            
+            const index = focusable.indexOf(e.target);
+            
+            if (index > -1 && index + 1 < focusable.length) {
+                // Move focus to the next element in the visual DOM tree
+                focusable[index + 1].focus();
+                
+                // If the next element is an input, auto-select its text for quick typing
+                if (focusable[index + 1].tagName === 'INPUT') {
+                    focusable[index + 1].select();
+                }
+            }
+        }
+    });
+    </script>
+</body>
+</html>
