@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -25,7 +25,12 @@
             <div class="mb-3"><label>Address</label><textarea id="c_address" class="form-control" rows="2"></textarea></div>
             <button class="btn btn-success w-100" onclick="saveCustomer()">Save Customer Info</button>
         </div>
+        
         <div class="col-md-8">
+            <div class="mb-3">
+                <input type="text" id="search_customer" class="form-control" placeholder="🔍 Search customers by name, mobile, or email..." oninput="loadCustomers()">
+            </div>
+            
             <div class="bg-white text-dark p-3 rounded">
                 <table class="table table-bordered">
                     <thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>Address</th><th>Actions</th></tr></thead>
@@ -36,17 +41,23 @@
     </div>
 
     <script>
+        // Updated to dynamically send search parameters to the server
         function loadCustomers() {
-            fetch('/api/customers').then(res => res.json()).then(data => {
-                let html = '';
-                data.forEach(c => {
-                    html += `<tr>
-                        <td>${c.name}</td><td>${c.mobile}</td><td>${c.email}</td><td>${c.address}</td>
-                        <td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.id})">Remove</button></td>
-                    </tr>`;
+            let searchQuery = document.getElementById('search_customer').value || '';
+            
+            // Append query string if user is searching
+            fetch(`/api/customers?q=${encodeURIComponent(searchQuery)}`)
+                .then(res => res.json())
+                .then(data => {
+                    let html = '';
+                    data.forEach(c => {
+                        html += `<tr>
+                            <td>${c.name}</td><td>${c.mobile}</td><td>${c.email}</td><td>${c.address}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.id})">Remove</button></td>
+                        </tr>`;
+                    });
+                    document.getElementById('customer-body').innerHTML = html;
                 });
-                document.getElementById('customer-body').innerHTML = html;
-            });
         }
 
         function saveCustomer() {
@@ -56,7 +67,14 @@
             };
             fetch('/api/customers', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-            }).then(() => { loadCustomers(); });
+            }).then(() => { 
+                // Reset inputs and reload
+                document.getElementById('c_name').value = '';
+                document.getElementById('c_mobile').value = '';
+                document.getElementById('c_email').value = '';
+                document.getElementById('c_address').value = '';
+                loadCustomers(); 
+            });
         }
 
         function deleteCustomer(id) {
@@ -64,37 +82,28 @@
                 fetch(`/api/customers/${id}`, { method: 'DELETE' }).then(() => loadCustomers());
             }
         }
+        
         window.onload = loadCustomers;
-// Intercept Enter key and turn it into a Tab focus switch
-    document.addEventListener('keydown', function (e) {
-        // Check if the pressed key is Enter and we are inside an input, select, or textarea
-        if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
-            
-            // If it's a textarea, let Enter behave normally (new line) unless you hold Shift
-            if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
-                return; 
-            }
 
-            // Prevent the default form submission behavior of the Enter key
-            e.preventDefault();
-
-            // Find all visible, enabled input elements on the page
-            const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
-            const focusable = Array.from(document.querySelectorAll(selectors));
-            
-            const index = focusable.indexOf(e.target);
-            
-            if (index > -1 && index + 1 < focusable.length) {
-                // Move focus to the next element in the visual DOM tree
-                focusable[index + 1].focus();
+        // Intercept Enter key and turn it into a Tab focus switch
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
+                if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
+                    return; 
+                }
+                e.preventDefault();
+                const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
+                const focusable = Array.from(document.querySelectorAll(selectors));
+                const index = focusable.indexOf(e.target);
                 
-                // If the next element is an input, auto-select its text for quick typing
-                if (focusable[index + 1].tagName === 'INPUT') {
-                    focusable[index + 1].select();
+                if (index > -1 && index + 1 < focusable.length) {
+                    focusable[index + 1].focus();
+                    if (focusable[index + 1].tagName === 'INPUT') {
+                        focusable[index + 1].select();
+                    }
                 }
             }
-        }
-    });
+        });
     </script>
 </body>
 </html>
