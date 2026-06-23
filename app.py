@@ -161,12 +161,28 @@ def lookup_customer(mobile):
 def customers_page():
     return render_template('customers.html')
 
+# --- Consolidated Search-Enabled Customers Route ---
 @app.route('/api/customers', methods=['GET', 'POST'])
 @login_required
 def handle_customers():
     conn = get_db()
     if request.method == 'GET':
-        rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
+        # Grab the search query parameter 'q'
+        search_query = request.args.get('q', '').strip()
+        
+        if search_query:
+            # Query with filters using SQLite safe parameter substitution
+            sql = """
+                SELECT * FROM customers 
+                WHERE name LIKE ? OR mobile LIKE ? OR email LIKE ? 
+                ORDER BY id DESC
+            """
+            like_param = f"%{search_query}%"
+            rows = conn.execute(sql, (like_param, like_param, like_param)).fetchall()
+        else:
+            # Fallback to returning all customers if query is blank
+            rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
+            
         return jsonify([dict(r) for r in rows])
     
     data = request.json
@@ -223,7 +239,7 @@ def upload_document():
 @login_required
 def open_document(filename):
     return send_file(os.path.join(UPLOAD_FOLDER, filename))
-# add 22-06-2026
+
 @app.route('/api/documents', methods=['GET'])
 @login_required
 def get_documents():
@@ -235,24 +251,20 @@ def get_documents():
 @login_required
 def delete_document(doc_id):
     conn = get_db()
-    # 1. Fetch the filename first so we can remove it from disk
     doc = conn.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,)).fetchone()
     
     if doc:
         filename = doc['filename']
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         
-        # Remove physical file if it exists
         if os.path.exists(file_path):
             os.remove(file_path)
             
-        # 2. Delete database entry
         conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
         conn.commit()
         return jsonify({"status": "success", "message": "Document deleted"})
         
     return jsonify({"status": "error", "message": "Document not found"}), 404
-# end add
 
 @app.route('/qr')
 @login_required
