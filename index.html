@@ -1,67 +1,136 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Under Maintenance</title>
-
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            text-align: center;
-        }
-
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            max-width: 400px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        p {
-            color: #666;
-        }
-
-        .icon {
-            font-size: 60px;
-            margin-bottom: 20px;
-        }
-
-        /* NEW: Image styling */
-        .profile-img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%; /* makes it a circle */
-            object-fit: cover;
-            margin-bottom: 20px;
-            border: 3px solid #ddd;
-        }
-    </style>
+    <title>DALIL Information System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>body { background-color: #2c3e50; color: white; }</style>
 </head>
-<body>
-    <div class="container">
-        
-        <!-- ADD YOUR PHOTO HERE -->
-	<a href="https://ibrahimoia.github.io/my-profile/">
-        <img src="web.jpg" alt="My Photo" class="profile-img">
-	</a>
-        <div class="icon">🚧</div>
-        <h1>Page Under Maintenance</h1>
-        <p>We’re currently fixing and improving this page.<br>
-           Please check back again soon.</p>
+<body class="p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">DALIL INFORMATION SYSTEM</h2>
+            {% if username %}
+            <small class="text-light-50 text-opacity-75">User: <span class="text-warning fw-bold">{{ username }}</span></small>
+            {% endif %}
+        </div>
+        <div>
+            <a href="/" class="btn btn-primary active">Transactions</a>
+            <a href="/customers" class="btn btn-light">Customers</a>
+            <a href="/documents" class="btn btn-light">Documents</a>
+            <a href="/qr" class="btn btn-light">QR Generator</a>
+            <a href="/logout" class="btn btn-danger">Logout</a>
+        </div>
     </div>
+
+    <div class="row">
+        <div class="col-md-3 bg-dark p-3 rounded">
+            <h5 class="text-warning mb-3">Transaction Entry</h5>
+            <div class="mb-2"><label>Mobile</label><input type="text" id="mobile" class="form-control" onblur="lookupCustomer()"></div>
+            <div class="mb-2"><label>Name</label><input type="text" id="name" class="form-control"></div>
+            <div class="mb-2"><label>Description</label><input type="text" id="dec" class="form-control"></div>
+            <div class="mb-2"><label>Date</label><input type="text" id="date" class="form-control" value="10-06-2026"></div>
+            <div class="mb-2"><label>Category</label>
+                <select id="catg" class="form-select"><option>Account</option><option>Information</option></select>
+            </div>
+            <div class="mb-2"><label>Debit (Dr)</label><input type="number" id="dr" class="form-control" value="0"></div>
+            <div class="mb-3"><label>Credit (Cr)</label><input type="number" id="cr" class="form-control" value="0"></div>
+            <button class="btn btn-success w-100 mb-2" onclick="saveTransaction()">Save Record</button>
+            <button class="btn btn-info w-100" onclick="printReport()">Print Report</button>
+        </div>
+
+        <div class="col-md-9">
+            <div class="bg-white text-dark p-3 rounded h-100">
+                <table class="table table-striped">
+                    <thead><tr><th>Mobile</th><th>Name</th><th>Desc</th><th>Date</th><th>Catg</th><th>Dr</th><th>Cr</th><th>Action</th></tr></thead>
+                    <tbody id="transaction-body"></tbody>
+                </table>
+                <div class="d-flex justify-content-end gap-3 font-weight-bold p-2 bg-light">
+                    <div>Total Dr: <span id="sum-dr" class="text-danger">0.00</span></div>
+                    <div>Total Cr: <span id="sum-cr" class="text-success">0.00</span></div>
+                    <div>Net Balance: <span id="net-balance" class="text-primary">0.00</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadTransactions() {
+            fetch('/api/transactions').then(res => res.json()).then(data => {
+                let html = '', drTotal = 0, crTotal = 0;
+                data.forEach(t => {
+                    drTotal += t.dr; crTotal += t.cr;
+                    html += `<tr>
+                        <td>${t.mobile}</td><td>${t.name}</td><td>${t.dec}</td><td>${t.date}</td><td>${t.catg}</td>
+                        <td>${t.dr.toFixed(2)}</td><td>${t.cr.toFixed(2)}</td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deleteRec(${t.id})">Delete</button></td>
+                    </tr>`;
+                });
+                document.getElementById('transaction-body').innerHTML = html;
+                document.getElementById('sum-dr').innerText = drTotal.toFixed(2);
+                document.getElementById('sum-cr').innerText = crTotal.toFixed(2);
+                document.getElementById('net-balance').innerText = (crTotal - drTotal).toFixed(2);
+            });
+        }
+
+        function lookupCustomer() {
+            let mobile = document.getElementById('mobile').value;
+            if(mobile) {
+                fetch(`/api/customers/lookup/${mobile}`).then(res=>res.json()).then(data=>{
+                    if(data.found) document.getElementById('name').value = data.name;
+                });
+            }
+        }
+
+        function saveTransaction() {
+            let payload = {
+                mobile: document.getElementById('mobile').value, name: document.getElementById('name').value,
+                dec: document.getElementById('dec').value, date: document.getElementById('date').value,
+                catg: document.getElementById('catg').value, dr: document.getElementById('dr').value, cr: document.getElementById('cr').value
+            };
+            fetch('/api/transactions', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            }).then(() => { loadTransactions(); clearForm(); });
+        }
+
+        function deleteRec(id) {
+            if(confirm("Delete entry?")) {
+                fetch(`/api/transactions/${id}`, { method: 'DELETE' }).then(() => loadTransactions());
+            }
+        }
+
+        function printReport() {
+            let mobile = document.getElementById('mobile').value;
+            window.open(`/api/report/generate?mobile=${mobile}`, '_blank');
+        }
+
+        function clearForm() {
+            document.getElementById('mobile').value = ''; document.getElementById('name').value = '';
+            document.getElementById('dec').value = ''; document.getElementById('dr').value = '0'; document.getElementById('cr').value = '0';
+        }
+
+        window.onload = loadTransactions;
+
+        // Intercept Enter key and turn it into a Tab focus switch
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
+                if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
+                    return; 
+                }
+                e.preventDefault();
+
+                const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
+                const focusable = Array.from(document.querySelectorAll(selectors));
+                const index = focusable.indexOf(e.target);
+                
+                if (index > -1 && index + 1 < focusable.length) {
+                    focusable[index + 1].focus();
+                    if (focusable[index + 1].tagName === 'INPUT') {
+                        focusable[index + 1].select();
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
