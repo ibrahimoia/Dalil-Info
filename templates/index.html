@@ -2,52 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DALIL Information System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <style>body { background-color: #2c3e50; color: white; }</style>
+    <style>
+        body { background-color: #2c3e50; color: white; }
+        /* Smooth scrolling for responsive tables */
+        .table-responsive { max-height: 70vh; overflow-y: auto; }
+    </style>
 </head>
-<body class="p-4">
-    <div class="d-flex justify-content-between mb-4">
-        <h2>DALIL INFORMATION SYSTEM</h2>
-        <div>
-            <a href="/" class="btn btn-primary active">Transactions</a>
-            <a href="/customers" class="btn btn-light">Customers</a>
-            <a href="/documents" class="btn btn-light">Documents</a>
-            <a href="/qr" class="btn btn-light">QR Generator</a>
-	    <a href="/logout" class="btn btn-danger">Logout</a>
-        </div>
-    </div>
+<body class="p-2 p-md-4">
 
-    <div class="row">
-        <div class="col-md-3 bg-dark p-3 rounded">
-            <h5 class="text-warning mb-3">Transaction Entry</h5>
-            <div class="mb-2"><label>Mobile</label><input type="text" id="mobile" class="form-control" onblur="lookupCustomer()"></div>
-            <div class="mb-2"><label>Name</label><input type="text" id="name" class="form-control"></div>
-            <div class="mb-2"><label>Description</label><input type="text" id="dec" class="form-control"></div>
-            <div class="mb-2"><label>Date</label><input type="text" id="date" class="form-control" value="10-06-2026"></div>
-            <div class="mb-2"><label>Category</label>
-                <select id="catg" class="form-select"><option>Account</option><option>Information</option></select>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-transparent mb-4">
+        <div class="container-fluid px-0">
+            <div>
+                <h2 class="mb-0 h4 h2-md text-uppercase fw-bold">DALIL INFORMATION SYSTEM</h2>
+                {% if username %}
+                <small class="text-light text-opacity-75">User: <span class="text-warning fw-bold">{{ username }}</span></small>
+                {% endif %}
             </div>
-            <div class="mb-2"><label>Debit (Dr)</label><input type="number" id="dr" class="form-control" value="0"></div>
-            <div class="mb-3"><label>Credit (Cr)</label><input type="number" id="cr" class="form-control" value="0"></div>
-            <button class="btn btn-success w-100 mb-2" onclick="saveTransaction()">Save Record</button>
-            <button class="btn btn-info w-100" onclick="printReport()">Print Report</button>
+            <button class="navbar-toggler border-secondary mt-2 mt-lg-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end mt-3 mt-lg-0" id="navbarNav">
+                <div class="d-flex flex-column flex-lg-row gap-2 w-100 justify-content-end">
+                    <a href="/" class="btn btn-primary active">Transactions</a>
+                    <a href="/customers" class="btn btn-light">Customers</a>
+                    <a href="/documents" class="btn btn-light">Documents</a>
+                    <a href="/qr" class="btn btn-light">QR Generator</a>
+                    <a href="/logout" class="btn btn-danger">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-3">
+            <div class="bg-dark p-3 rounded">
+                <h5 class="text-warning mb-3">Transaction Entry</h5>
+                <div class="mb-2"><label class="form-label mb-1">Mobile</label><input type="text" id="mobile" class="form-control" onblur="lookupCustomer()"></div>
+                <div class="mb-2"><label class="form-label mb-1">Name</label><input type="text" id="name" class="form-control"></div>
+                <div class="mb-2"><label class="form-label mb-1">Description</label><input type="text" id="dec" class="form-control"></div>
+                <div class="mb-2"><label class="form-label mb-1">Date</label><input type="text" id="date" class="form-control" value="10-06-2026"></div>
+                <div class="mb-2"><label class="form-label mb-1">Category</label>
+                    <select id="catg" class="form-select"><option>Account</option><option>Information</option></select>
+                </div>
+                <div class="mb-2"><label class="form-label mb-1">Debit (Dr)</label><input type="number" id="dr" class="form-control" value="0"></div>
+                <div class="mb-3"><label class="form-label mb-1">Credit (Cr)</label><input type="number" id="cr" class="form-control" value="0"></div>
+                <button class="btn btn-success w-100 mb-2" onclick="saveTransaction()">Save Record</button>
+                <button class="btn btn-info w-100" onclick="printReport()">Print Report</button>
+            </div>
         </div>
 
-        <div class="col-md-9">
-            <div class="bg-white text-dark p-3 rounded h-100">
-                <table class="table table-striped">
-                    <thead><tr><th>Mobile</th><th>Name</th><th>Desc</th><th>Date</th><th>Catg</th><th>Dr</th><th>Cr</th><th>Action</th></tr></thead>
-                    <tbody id="transaction-body"></tbody>
-                </table>
-                <div class="d-flex justify-content-end gap-3 font-weight-bold p-2 bg-light">
+        <div class="col-12 col-lg-9">
+            <div class="bg-white text-dark p-3 rounded d-flex flex-column h-100">
+                <div class="table-responsive w-100 flex-grow-1">
+                    <table class="table table-striped align-middle">
+                        <thead><tr><th>Mobile</th><th>Name</th><th>Desc</th><th>Date</th><th>Catg</th><th>Dr</th><th>Cr</th><th>Action</th></tr></thead>
+                        <tbody id="transaction-body"></tbody>
+                    </table>
+                </div>
+                
+                <div class="d-flex flex-wrap justify-content-between justify-content-md-end gap-3 fw-bold p-3 bg-light rounded mt-3">
                     <div>Total Dr: <span id="sum-dr" class="text-danger">0.00</span></div>
                     <div>Total Cr: <span id="sum-cr" class="text-success">0.00</span></div>
-                    <div>Net Balance: <span id="net-balance" class="text-primary">0.00</span></div>
+                    <div class="w-100 d-md-none"></div> <div>Net Balance: <span id="net-balance" class="text-primary">0.00</span></div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         function loadTransactions() {
@@ -105,36 +130,27 @@
         }
 
         window.onload = loadTransactions;
-// Intercept Enter key and turn it into a Tab focus switch
-    document.addEventListener('keydown', function (e) {
-        // Check if the pressed key is Enter and we are inside an input, select, or textarea
-        if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
-            
-            // If it's a textarea, let Enter behave normally (new line) unless you hold Shift
-            if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
-                return; 
-            }
 
-            // Prevent the default form submission behavior of the Enter key
-            e.preventDefault();
+        // Intercept Enter key and turn it into a Tab focus switch
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
+                if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) {
+                    return; 
+                }
+                e.preventDefault();
 
-            // Find all visible, enabled input elements on the page
-            const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
-            const focusable = Array.from(document.querySelectorAll(selectors));
-            
-            const index = focusable.indexOf(e.target);
-            
-            if (index > -1 && index + 1 < focusable.length) {
-                // Move focus to the next element in the visual DOM tree
-                focusable[index + 1].focus();
+                const selectors = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[onclick]';
+                const focusable = Array.from(document.querySelectorAll(selectors));
+                const index = focusable.indexOf(e.target);
                 
-                // If the next element is an input, auto-select its text for quick typing
-                if (focusable[index + 1].tagName === 'INPUT') {
-                    focusable[index + 1].select();
+                if (index > -1 && index + 1 < focusable.length) {
+                    focusable[index + 1].focus();
+                    if (focusable[index + 1].tagName === 'INPUT') {
+                        focusable[index + 1].select();
+                    }
                 }
             }
-        }
-    });
+        });
     </script>
 </body>
 </html>

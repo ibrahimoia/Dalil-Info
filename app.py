@@ -40,22 +40,18 @@ def init_db():
                 password TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )""")
-        # ADDED 'username TEXT NOT NULL' to tie transaction data to a user
         conn.execute("""
             CREATE TABLE IF NOT EXISTS dalilinfo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
                 name TEXT, mobile TEXT, dec TEXT, date TEXT, catg TEXT, dr REAL, cr REAL
             )""")
-        # ADDED 'username TEXT NOT NULL' and removed UNIQUE from mobile 
-        # (different users might save the same customer mobile number)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS customers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
                 name TEXT NOT NULL, mobile TEXT NOT NULL, email TEXT, address TEXT, created_date TEXT
             )""")
-        # ADDED 'username TEXT NOT NULL' to tie documents to a user
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +80,8 @@ def login_page():
         else:
             return render_template('login.html', error="Invalid Username or Password!")
             
+    # --- FIXED: Clears any lingering user session data on a fresh GET request ---
+    session.clear()
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -97,12 +95,10 @@ def register_page():
             return render_template('register.html', error="Passwords do not match!")
             
         conn = get_db()
-        # Verify if username is already taken
         existing_user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing_user:
             return render_template('register.html', error="Username is already registered!")
             
-        # Hash the password before saving to database
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -125,15 +121,12 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    # Pass the session username into the template
     return render_template('index.html', username=session.get('username'))
-
 
 @app.route('/api/transactions', methods=['GET'])
 @login_required
 def get_transactions():
     conn = get_db()
-    # Filtered by logged-in user
     rows = conn.execute("SELECT * FROM dalilinfo WHERE username = ? ORDER BY id DESC", (session['username'],)).fetchall()
     return jsonify([dict(ix) for ix in rows])
 
@@ -142,7 +135,6 @@ def get_transactions():
 def add_transaction():
     data = request.json
     conn = get_db()
-    # Saved with the session username
     conn.execute("""
         INSERT INTO dalilinfo (username, name, mobile, dec, date, catg, dr, cr)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -154,7 +146,6 @@ def add_transaction():
 @login_required
 def delete_transaction(rec_id):
     conn = get_db()
-    # Double validation: ensuring the item actually belongs to the user attempting to delete it
     conn.execute("DELETE FROM dalilinfo WHERE id=? AND username=?", (rec_id, session['username']))
     conn.commit()
     return jsonify({"status": "deleted"})
@@ -163,7 +154,6 @@ def delete_transaction(rec_id):
 @login_required
 def lookup_customer(mobile):
     conn = get_db()
-    # Filtered by logged-in user
     row = conn.execute("SELECT name, mobile FROM customers WHERE mobile = ? AND username = ?", (mobile, session['username'])).fetchone()
     if row:
         return jsonify({"found": True, "name": row['name']})
@@ -174,7 +164,6 @@ def lookup_customer(mobile):
 def customers_page():
     return render_template('customers.html')
 
-# --- Consolidated Search-Enabled Customers Route ---
 @app.route('/api/customers', methods=['GET', 'POST'])
 @login_required
 def handle_customers():
@@ -182,11 +171,9 @@ def handle_customers():
     current_user = session['username']
     
     if request.method == 'GET':
-        # Grab the search query parameter 'q'
         search_query = request.args.get('q', '').strip()
         
         if search_query:
-            # Query with filters restricted strictly to user context
             sql = """
                 SELECT * FROM customers 
                 WHERE username = ? AND (name LIKE ? OR mobile LIKE ? OR email LIKE ?) 
@@ -195,13 +182,11 @@ def handle_customers():
             like_param = f"%{search_query}%"
             rows = conn.execute(sql, (current_user, like_param, like_param, like_param)).fetchall()
         else:
-            # Only fetch customers belonging to the logged-in user
             rows = conn.execute("SELECT * FROM customers WHERE username = ? ORDER BY id DESC", (current_user,)).fetchall()
             
         return jsonify([dict(r) for r in rows])
     
     data = request.json
-    # Unique scoping: search for an existing entry within this user's dataset
     existing = conn.execute("SELECT id FROM customers WHERE mobile=? AND username=?", (data['mobile'], current_user)).fetchone()
     
     if not existing:
@@ -247,7 +232,6 @@ def upload_document():
         filename = f"{next_id}.pdf"
         file.save(os.path.join(UPLOAD_FOLDER, filename))
         
-        # Save filename linked to user
         conn.execute("INSERT INTO documents (username, filename, description, uploaded_date) VALUES (?, ?, ?, ?)",
                      (session['username'], filename, desc, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         conn.commit()
@@ -257,7 +241,6 @@ def upload_document():
 @login_required
 def open_document(filename):
     conn = get_db()
-    # Secure validation check: verify user owns this physical filename entry before downloading
     doc = conn.execute("SELECT id FROM documents WHERE filename = ? AND username = ?", (filename, session['username'])).fetchone()
     if not doc:
         return "Access Denied: You do not own this document.", 403
@@ -274,7 +257,6 @@ def get_documents():
 @login_required
 def delete_document(doc_id):
     conn = get_db()
-    # Confirm item ownership before disk/db clean up
     doc = conn.execute("SELECT filename FROM documents WHERE id = ? AND username = ?", (doc_id, session['username'])).fetchone()
     
     if doc:
@@ -302,7 +284,6 @@ def generate_qr():
     content = data.get('content')
     filename = data.get('filename', 'qrcode')
     
-    # Prepend username to filename to avoid folder conflicts among multiple users saving same title
     safe_filename = f"{session['username']}_{filename}.png"
     qr_path = os.path.join(UPLOAD_FOLDER, safe_filename)
     img = qrcode.make(content)
@@ -316,7 +297,6 @@ def generate_pdf_report():
     conn = get_db()
     current_user = session['username']
     
-    # Filter report inputs explicitly using context parameters
     if mobile_filter:
         rows = conn.execute("SELECT name, mobile, dec, date, catg, dr, cr FROM dalilinfo WHERE mobile=? AND username=?", (mobile_filter, current_user)).fetchall()
         title = f"STATEMENT FOR MOBILE: {mobile_filter}"
