@@ -55,6 +55,10 @@
         </div>
 
         <div class="col-12 col-lg-9">
+            <div class="bg-dark p-3 rounded mb-3">
+                <input type="text" id="search-input" class="form-control" placeholder="Search transactions by Name, Mobile, Description, or Category..." oninput="loadTransactions()">
+            </div>
+
             <div class="bg-white text-dark p-3 rounded d-flex flex-column h-100">
                 <div class="table-responsive w-100 flex-grow-1">
                     <table class="table table-striped align-middle">
@@ -76,21 +80,27 @@
 
     <script>
         function loadTransactions() {
-            fetch('/api/transactions').then(res => res.json()).then(data => {
-                let html = '', drTotal = 0, crTotal = 0;
-                data.forEach(t => {
-                    drTotal += t.dr; crTotal += t.cr;
-                    html += `<tr>
-                        <td>${t.mobile}</td><td>${t.name}</td><td>${t.dec}</td><td>${t.date}</td><td>${t.catg}</td>
-                        <td>${t.dr.toFixed(2)}</td><td>${t.cr.toFixed(2)}</td>
-                        <td><button class="btn btn-danger btn-sm" onclick="deleteRec(${t.id})">Delete</button></td>
-                    </tr>`;
+            // Get value from the search bar
+            const searchQuery = document.getElementById('search-input').value.trim();
+            
+            // Fetch records dynamically while handling empty or matching text values
+            fetch(`/api/transactions?q=${encodeURIComponent(searchQuery)}`)
+                .then(res => res.json())
+                .then(data => {
+                    let html = '', drTotal = 0, crTotal = 0;
+                    data.forEach(t => {
+                        drTotal += t.dr; crTotal += t.cr;
+                        html += `<tr>
+                            <td>${t.mobile}</td><td>${t.name}</td><td>${t.dec}</td><td>${t.date}</td><td>${t.catg}</td>
+                            <td>${t.dr.toFixed(2)}</td><td>${t.cr.toFixed(2)}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="deleteRec(${t.id})">Delete</button></td>
+                        </tr>`;
+                    });
+                    document.getElementById('transaction-body').innerHTML = html;
+                    document.getElementById('sum-dr').innerText = drTotal.toFixed(2);
+                    document.getElementById('sum-cr').innerText = crTotal.toFixed(2);
+                    document.getElementById('net-balance').innerText = (crTotal - drTotal).toFixed(2);
                 });
-                document.getElementById('transaction-body').innerHTML = html;
-                document.getElementById('sum-dr').innerText = drTotal.toFixed(2);
-                document.getElementById('sum-cr').innerText = crTotal.toFixed(2);
-                document.getElementById('net-balance').innerText = (crTotal - drTotal).toFixed(2);
-            });
         }
 
         function lookupCustomer() {

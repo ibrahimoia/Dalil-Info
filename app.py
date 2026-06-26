@@ -123,11 +123,25 @@ def logout():
 def index():
     return render_template('index.html', username=session.get('username'))
 
+# --- UPDATED: Route supporting live text search for Transactions ---
 @app.route('/api/transactions', methods=['GET'])
 @login_required
 def get_transactions():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM dalilinfo WHERE username = ? ORDER BY id DESC", (session['username'],)).fetchall()
+    current_user = session['username']
+    search_query = request.args.get('q', '').strip()
+    
+    if search_query:
+        sql = """
+            SELECT * FROM dalilinfo 
+            WHERE username = ? AND (name LIKE ? OR mobile LIKE ? OR dec LIKE ? OR catg LIKE ?) 
+            ORDER BY id DESC
+        """
+        like_param = f"%{search_query}%"
+        rows = conn.execute(sql, (current_user, like_param, like_param, like_param, like_param)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM dalilinfo WHERE username = ? ORDER BY id DESC", (current_user,)).fetchall()
+        
     return jsonify([dict(ix) for ix in rows])
 
 @app.route('/api/transactions', methods=['POST'])
@@ -246,11 +260,25 @@ def open_document(filename):
         return "Access Denied: You do not own this document.", 403
     return send_file(os.path.join(UPLOAD_FOLDER, filename))
 
+# --- UPDATED: Route supporting live text search for uploaded Documents ---
 @app.route('/api/documents', methods=['GET'])
 @login_required
 def get_documents():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM documents WHERE username = ? ORDER BY id DESC", (session['username'],)).fetchall()
+    current_user = session['username']
+    search_query = request.args.get('q', '').strip()
+    
+    if search_query:
+        sql = """
+            SELECT * FROM documents 
+            WHERE username = ? AND (filename LIKE ? OR description LIKE ?) 
+            ORDER BY id DESC
+        """
+        like_param = f"%{search_query}%"
+        rows = conn.execute(sql, (current_user, like_param, like_param)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM documents WHERE username = ? ORDER BY id DESC", (current_user,)).fetchall()
+        
     return jsonify([dict(r) for r in rows])
 
 @app.route('/api/documents/<int:doc_id>', methods=['DELETE'])
