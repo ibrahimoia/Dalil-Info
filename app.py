@@ -40,19 +40,26 @@ def init_db():
                 password TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )""")
+        # ADDED 'username TEXT NOT NULL' to tie transaction data to a user
         conn.execute("""
             CREATE TABLE IF NOT EXISTS dalilinfo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
                 name TEXT, mobile TEXT, dec TEXT, date TEXT, catg TEXT, dr REAL, cr REAL
             )""")
+        # ADDED 'username TEXT NOT NULL' and removed UNIQUE from mobile 
+        # (different users might save the same customer mobile number)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS customers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL, mobile TEXT UNIQUE NOT NULL, email TEXT, address TEXT, created_date TEXT
+                username TEXT NOT NULL,
+                name TEXT NOT NULL, mobile TEXT NOT NULL, email TEXT, address TEXT, created_date TEXT
             )""")
+        # ADDED 'username TEXT NOT NULL' to tie documents to a user
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
                 filename TEXT NOT NULL, description TEXT NOT NULL, uploaded_date TEXT NOT NULL
             )""")
         conn.commit()
@@ -124,7 +131,8 @@ def index():
 @login_required
 def get_transactions():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM dalilinfo ORDER BY id DESC").fetchall()
+    # Filtered by logged-in user
+    rows = conn.execute("SELECT * FROM dalilinfo WHERE username = ? ORDER BY id DESC", (session['username'],)).fetchall()
     return jsonify([dict(ix) for ix in rows])
 
 @app.route('/api/transactions', methods=['POST'])
@@ -132,10 +140,11 @@ def get_transactions():
 def add_transaction():
     data = request.json
     conn = get_db()
+    # Saved with the session username
     conn.execute("""
-        INSERT INTO dalilinfo (name, mobile, dec, date, catg, dr, cr)
-        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (data['name'], data['mobile'], data['dec'], data['date'], data['catg'], float(data['dr'] or 0), float(data['cr'] or 0)))
+        INSERT INTO dalilinfo (username, name, mobile, dec, date, catg, dr, cr)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (session['username'], data['name'], data['mobile'], data['dec'], data['date'], data['catg'], float(data['dr'] or 0), float(data['cr'] or 0)))
     conn.commit()
     return jsonify({"status": "success"})
 
@@ -143,7 +152,8 @@ def add_transaction():
 @login_required
 def delete_transaction(rec_id):
     conn = get_db()
-    conn.execute("DELETE FROM dalilinfo WHERE id=?", (rec_id,))
+    # Double validation: ensuring the item actually belongs to the user attempting to delete it
+    conn.execute("DELETE FROM dalilinfo WHERE id=? AND username=?", (rec_id, session['username']))
     conn.commit()
     return jsonify({"status": "deleted"})
 
@@ -151,7 +161,8 @@ def delete_transaction(rec_id):
 @login_required
 def lookup_customer(mobile):
     conn = get_db()
-    row = conn.execute("SELECT name, mobile FROM customers WHERE mobile = ?", (mobile,)).fetchone()
+    # Filtered by logged-in user
+    row = conn.execute("SELECT name, mobile FROM customers WHERE mobile = ? AND username = ?", (mobile, session['username'])).fetchone()
     if row:
         return jsonify({"found": True, "name": row['name']})
     return jsonify({"found": False})
@@ -166,44 +177,48 @@ def customers_page():
 @login_required
 def handle_customers():
     conn = get_db()
+    current_user = session['username']
+    
     if request.method == 'GET':
         # Grab the search query parameter 'q'
         search_query = request.args.get('q', '').strip()
         
         if search_query:
-            # Query with filters using SQLite safe parameter substitution
+            # Query with filters restricted strictly to user context
             sql = """
                 SELECT * FROM customers 
-                WHERE name LIKE ? OR mobile LIKE ? OR email LIKE ? 
+                WHERE username = ? AND (name LIKE ? OR mobile LIKE ? OR email LIKE ?) 
                 ORDER BY id DESC
             """
             like_param = f"%{search_query}%"
-            rows = conn.execute(sql, (like_param, like_param, like_param)).fetchall()
+            rows = conn.execute(sql, (current_user, like_param, like_param, like_param)).fetchall()
         else:
-            # Fallback to returning all customers if query is blank
-            rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
+            # Only fetch customers belonging to the logged-in user
+            rows = conn.execute("SELECT * FROM customers WHERE username = ? ORDER BY id DESC", (current_user,)).fetchall()
             
         return jsonify([dict(r) for r in rows])
     
     data = request.json
-    try:
+    # Unique scoping: search for an existing entry within this user's dataset
+    existing = conn.execute("SELECT id FROM customers WHERE mobile=? AND username=?", (data['mobile'], current_user)).fetchone()
+    
+    if not existing:
         conn.execute("""
-            INSERT INTO customers (name, mobile, email, address, created_date)
-            VALUES (?, ?, ?, ?, ?)""",
-            (data['name'], data['mobile'], data['email'], data['address'], datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-    except sqlite3.IntegrityError:
+            INSERT INTO customers (username, name, mobile, email, address, created_date)
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            (current_user, data['name'], data['mobile'], data['email'], data['address'], datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    else:
         conn.execute("""
-            UPDATE customers SET name=?, email=?, address=? WHERE mobile=?""",
-            (data['name'], data['email'], data['address'], data['mobile']))
-        conn.commit()
+            UPDATE customers SET name=?, email=?, address=? WHERE mobile=? AND username=?""",
+            (data['name'], data['email'], data['address'], data['mobile'], current_user))
+    conn.commit()
     return jsonify({"status": "success"})
 
 @app.route('/api/customers/<int:c_id>', methods=['DELETE'])
 @login_required
 def delete_customer(c_id):
     conn = get_db()
-    conn.execute("DELETE FROM customers WHERE id=?", (c_id,))
+    conn.execute("DELETE FROM customers WHERE id=? AND username=?", (c_id, session['username']))
     conn.commit()
     return jsonify({"status": "success"})
 
@@ -230,28 +245,35 @@ def upload_document():
         filename = f"{next_id}.pdf"
         file.save(os.path.join(UPLOAD_FOLDER, filename))
         
-        conn.execute("INSERT INTO documents (filename, description, uploaded_date) VALUES (?, ?, ?)",
-                     (filename, desc, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        # Save filename linked to user
+        conn.execute("INSERT INTO documents (username, filename, description, uploaded_date) VALUES (?, ?, ?, ?)",
+                     (session['username'], filename, desc, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         conn.commit()
     return redirect('/documents')
 
 @app.route('/api/documents/open/<filename>')
 @login_required
 def open_document(filename):
+    conn = get_db()
+    # Secure validation check: verify user owns this physical filename entry before downloading
+    doc = conn.execute("SELECT id FROM documents WHERE filename = ? AND username = ?", (filename, session['username'])).fetchone()
+    if not doc:
+        return "Access Denied: You do not own this document.", 403
     return send_file(os.path.join(UPLOAD_FOLDER, filename))
 
 @app.route('/api/documents', methods=['GET'])
 @login_required
 def get_documents():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM documents ORDER BY id DESC").fetchall()
+    rows = conn.execute("SELECT * FROM documents WHERE username = ? ORDER BY id DESC", (session['username'],)).fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route('/api/documents/<int:doc_id>', methods=['DELETE'])
 @login_required
 def delete_document(doc_id):
     conn = get_db()
-    doc = conn.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    # Confirm item ownership before disk/db clean up
+    doc = conn.execute("SELECT filename FROM documents WHERE id = ? AND username = ?", (doc_id, session['username'])).fetchone()
     
     if doc:
         filename = doc['filename']
@@ -264,7 +286,7 @@ def delete_document(doc_id):
         conn.commit()
         return jsonify({"status": "success", "message": "Document deleted"})
         
-    return jsonify({"status": "error", "message": "Document not found"}), 404
+    return jsonify({"status": "error", "message": "Document not found or unauthorized"}), 404
 
 @app.route('/qr')
 @login_required
@@ -278,7 +300,9 @@ def generate_qr():
     content = data.get('content')
     filename = data.get('filename', 'qrcode')
     
-    qr_path = os.path.join(UPLOAD_FOLDER, f"{filename}.png")
+    # Prepend username to filename to avoid folder conflicts among multiple users saving same title
+    safe_filename = f"{session['username']}_{filename}.png"
+    qr_path = os.path.join(UPLOAD_FOLDER, safe_filename)
     img = qrcode.make(content)
     img.save(qr_path)
     return send_file(qr_path, as_attachment=True)
@@ -288,13 +312,15 @@ def generate_qr():
 def generate_pdf_report():
     mobile_filter = request.args.get('mobile')
     conn = get_db()
+    current_user = session['username']
     
+    # Filter report inputs explicitly using context parameters
     if mobile_filter:
-        rows = conn.execute("SELECT name, mobile, dec, date, catg, dr, cr FROM dalilinfo WHERE mobile=?", (mobile_filter,)).fetchall()
+        rows = conn.execute("SELECT name, mobile, dec, date, catg, dr, cr FROM dalilinfo WHERE mobile=? AND username=?", (mobile_filter, current_user)).fetchall()
         title = f"STATEMENT FOR MOBILE: {mobile_filter}"
     else:
-        rows = conn.execute("SELECT name, mobile, dec, date, catg, dr, cr FROM dalilinfo").fetchall()
-        title = "DALIL INFORMATION SYSTEM REPORT"
+        rows = conn.execute("SELECT name, mobile, dec, date, catg, dr, cr FROM dalilinfo WHERE username=?", (current_user,)).fetchall()
+        title = f"{current_user.upper()}'S INFORMATION SYSTEM REPORT"
         
     if not rows: return "No data found", 404
 
@@ -321,7 +347,7 @@ def generate_pdf_report():
         pdf.cell(col_widths[6], 8, f"{r['cr']:.2f}", 1)
         pdf.ln()
 
-    report_out = os.path.join(UPLOAD_FOLDER, "generated_report.pdf")
+    report_out = os.path.join(UPLOAD_FOLDER, f"{current_user}_generated_report.pdf")
     pdf.output(report_out)
     return send_file(report_out, as_attachment=False)
 
