@@ -125,7 +125,9 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    # Pass the session username into the template
+    return render_template('index.html', username=session.get('username'))
+
 
 @app.route('/api/transactions', methods=['GET'])
 @login_required
