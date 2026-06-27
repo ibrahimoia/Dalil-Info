@@ -29,30 +29,60 @@
 <body class="p-3">
 
     <div class="register-card">
-        <h3 class="text-center text-warning mb-4 fw-bold">USER REGISTRATION</h3>
-        
-        {% if error %}
-            <div class="alert alert-danger text-center py-2" role="alert">{{ error }}</div>
-        {% endif %}
+        {% if show_super_login %}
+            <!-- PHASE 1: Super User Challenge Form -->
+            <h3 class="text-center text-warning mb-4 fw-bold">SUPER USER LOCK</h3>
+            
+            {% if error %}
+                <div class="alert alert-danger text-center py-2" role="alert">{{ error }}</div>
+            {% endif %}
 
-        <form action="/register" method="POST" id="registerForm">
-            <div class="mb-3">
-                <label class="form-label">Choose Username</label>
-                <input type="text" name="username" class="form-control form-control-lg fs-6" placeholder="Minimum 3 characters" required autofocus>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control form-control-lg fs-6" placeholder="Enter secure password" required>
-            </div>
-            <div class="mb-4">
-                <label class="form-label">Confirm Password</label>
-                <input type="password" name="confirm_password" class="form-control form-control-lg fs-6" placeholder="Re-type password" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mb-3">Create Account</button>
-            <div class="text-center">
-                <a href="/login" class="text-light text-opacity-75 text-decoration-none small">← Back to Login Screen</a>
-            </div>
-        </form>
+            <form action="/register" method="POST" id="superLoginForm">
+                <div class="mb-3">
+                    <label class="form-label">Super Username</label>
+                    <input type="text" name="super_username" class="form-control form-control-lg fs-6" placeholder="Admin username" required autofocus>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Super Password</label>
+                    <input type="password" name="super_password" class="form-control form-control-lg fs-6" placeholder="Admin password" required>
+                </div>
+                <button type="submit" class="btn btn-warning text-dark w-100 fw-bold py-2 mb-3">Unlock Registration</button>
+                <div class="text-center">
+                    <a href="/login" class="text-light text-opacity-75 text-decoration-none small">← Back to Login Screen</a>
+                </div>
+            </form>
+
+        {% else %}
+            <!-- PHASE 2: Standard Account Creation Form -->
+            <h3 class="text-center text-warning mb-4 fw-bold">CREATE NEW USER</h3>
+            
+            {% if error %}
+                <div class="alert alert-danger text-center py-2" role="alert">{{ error }}</div>
+            {% endif %}
+            
+            {% if success %}
+                <div class="alert alert-success text-center py-2" role="alert">{{ success }}</div>
+            {% endif %}
+
+            <form action="/register" method="POST" id="registerForm">
+                <div class="mb-3">
+                    <label class="form-label">New Username</label>
+                    <input type="text" name="username" class="form-control form-control-lg fs-6" placeholder="Minimum 3 characters" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control form-control-lg fs-6" placeholder="Enter secure password" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" name="confirm_password" class="form-control form-control-lg fs-6" placeholder="Re-type password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mb-3">Create User Account</button>
+                <div class="text-center">
+                    <a href="/register/exit" class="btn btn-sm btn-outline-danger w-100 fw-bold small">🔒 Lock Panel & Exit</a>
+                </div>
+            </form>
+        {% endif %}
     </div>
 
     <script>
